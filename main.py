@@ -160,4 +160,3 @@ if summarize_button:
                 st.error(f"❌ An error occurred during summarization: {str(e)}")
     else:
         st.warning("Please transcribe the audio/video first.")
-
