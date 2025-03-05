@@ -6,7 +6,7 @@ import wave
 import io
 from moviepy import VideoFileClip
 from dotenv import load_dotenv
-import pdfkit
+import reportlab
 
 load_dotenv()
 
@@ -63,14 +63,15 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-def transcribe_audio(audio_file):
+languages = {"English": "en", "Hindi": "hi", "Marathi": "mr", "Telugu": "te", "Hinglish": "hi"}
+def transcribe_audio(audio_file, lang):
+    print(lang)
     with open(audio_file, "rb") as file:
         transcription = client.audio.transcriptions.create(
             file=(os.path.basename(audio_file), file.read()),
             model="whisper-large-v3",
             response_format="json",
-            language="en",
+            language=lang,
             temperature=0.0,
         )
     return transcription.text
@@ -92,6 +93,8 @@ if uploaded_file is not None:
         st.audio(file_bytes)
     elif uploaded_file.type.startswith("video"):
         st.audio(file_bytes)
+
+selected_language = st.selectbox("Choose Language", options=list(languages.keys()))
 
 col1, col2, col3 = st.columns(3)
 
@@ -116,7 +119,7 @@ if transcribe_button:
                 os.unlink(temp_file_path)
                 temp_file_path = audio_file_path
 
-            transcription = transcribe_audio(temp_file_path)
+            transcription = transcribe_audio(temp_file_path, languages.get(selected_language, "en"))
 
             st.subheader("📝 Transcription:")
             x = st.text_area(
@@ -166,43 +169,82 @@ if summarize_button:
 
 
 if pdf_button:
-    if "transcription" in st.session_state and st.session_state.transcription.strip():
-        pdf_filename = st.text_input("Enter PDF name", "transcription_report.pdf")
-        transcription_text = st.session_state.transcription.replace("\n", "<br>")
-        html_content = f"""
-        <html>x 
-        <head>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 40px;
-                    color: #333;
-                }}
-                h1 {{
-                    color: #BB86FC;
-                }}
-                p {{
-                    line-height: 1.6;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>Transcription Report</h1>
-            <p>{transcription_text}</p>
-        </body>
-        </html>
-        """
-
+    if "transcription" in st.session_state:
         with st.spinner("Generating PDF..."):
-            pdf_path = "output.pdf"
-            pdfkit.from_string(html_content, pdf_path)
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.colors import black
+            import tempfile
+            import textwrap
 
+            transcription_text = st.session_state.transcription
+
+            # Create a temporary PDF file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+                pdf_path = temp_pdf.name
+
+            # Generate PDF
+            c = canvas.Canvas(pdf_path, pagesize=letter)
+            width, height = letter
+
+            def draw_border():
+                border_thickness = 8  # Adjust thickness
+                margin = 20  # Space from the edge
+                c.setStrokeColor(black)
+                c.setLineWidth(border_thickness)
+                c.rect(margin, margin, width - 2 * margin, height - 2 * margin)
+
+            def add_page():
+                c.showPage()
+                draw_border()
+                c.setFont("Helvetica", 12)
+                add_title()
+                return height - 80
+
+            def add_title():
+                c.setFont("Helvetica-Bold", 18)  # Title font
+                title = "BhashaBridge for Realtors"
+                c.setFillColor("blue")
+                text_width = c.stringWidth(title, "Helvetica-Bold", 18)
+                c.drawString((width - text_width) / 2, height - 50, title)
+
+            # Draw first border & title
+            draw_border()
+            add_title()
+            c.setFillColor("black")
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(100, height - 70, "Transcription Report")
+            # Content
+            c.setFont("Helvetica", 12)
+            margin = 50  # Left margin
+            max_width = width - 2 * margin  # Maximum text width
+            y_position = height - 100
+            line_height = 16  # Line spacing
+
+            # Wrap text so it doesn't exceed page width
+            wrapped_text = []
+            for paragraph in transcription_text.split("\n"):
+                wrapped_text.extend(textwrap.wrap(paragraph, width=90))  # Adjust width if needed
+                wrapped_text.append("")  # Add a blank line for spacing
+
+            for line in wrapped_text:
+                if y_position < 50:  # New page when reaching the bottom
+                    y_position = add_page()
+
+                c.drawString(margin, y_position, line)
+                y_position -= line_height
+
+            c.save()
+
+            # Download Button
             with open(pdf_path, "rb") as pdf_file:
                 st.download_button(
-                    "📄 Download Transcription PDF",
-                    data=pdf_file,
-                    file_name=pdf_filename,
-                    mime="application/pdf"
+                    "📄 Download PDF",
+                    pdf_file,
+                    file_name="transcription.pdf",
+                    mime="application/pdf",
                 )
+
+            os.unlink(pdf_path)  # Clean up temporary file
     else:
-        st.warning("No transcription available. Please transcribe first.")
+        st.warning("Please transcribe the audio/video first.")
