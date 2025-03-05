@@ -4,7 +4,7 @@ import io
 import os
 import pdfkit
 import streamlit as st
-# Dummy data
+
 fruits = ['apple', 'blueberry', 'cherry', 'orange']
 counts = [40, 100, 30, 55]
 bar_labels = ['green', 'blue', 'red', 'orange']
@@ -33,19 +33,19 @@ pdfkit.from_string(html, file_name)
 with open(file_name, "rb") as f:
     pdf_base64 = base64.b64encode(f.read())
 
-# Send PDF as email attachment
-email_server = pq.connect('Postmark')
-email = {
-    "from": "no-reply@acme.com",
-    "to": "john@acme.com",
-    "subject": "Your report",
-    "text": "See PDF file attached.",
-    "html": "See PDF file attached.",
-    "attachment_name": "report.pdf",
-    "attachment_content_base64": pdf_base64.decode("ascii"),
-    "attachment_contenttype": "application/octet-stream"
-}
-result = email_server.add('email_with_attachment', email)
-st.json(result) # for testing only, show result of sending email
+# # Send PDF as email attachment
+# email_server = pq.connect('Postmark')
+# email = {
+#     "from": "no-reply@acme.com",
+#     "to": "john@acme.com",
+#     "subject": "Your report",
+#     "text": "See PDF file attached.",
+#     "html": "See PDF file attached.",
+#     "attachment_name": "report.pdf",
+#     "attachment_content_base64": pdf_base64.decode("ascii"),
+#     "attachment_contenttype": "application/octet-stream"
+# }
+# result = email_server.add('email_with_attachment', email)
+# st.json(result) # for testing only, show result of sending email
 
-os.remove(file_name)
+# os.remove(file_name)

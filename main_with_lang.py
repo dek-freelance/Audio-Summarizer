@@ -11,6 +11,8 @@ from reportlab.lib.colors import black
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 import textwrap
+import ffmpeg
+import subprocess
 
 load_dotenv()
 client = Groq(api_key=os.getenv("groq_api_key"))
@@ -31,9 +33,18 @@ def transcribe_audio(audio_file):
 
 def extract_audio_from_video(video_file):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio_file:
-        with VideoFileClip(video_file) as video:
-            video.audio.write_audiofile(temp_audio_file.name, codec="mp3")
-        return temp_audio_file.name
+        audio_path = temp_audio_file.name
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", video_file, "-vn", "-acodec", "mp3", audio_path, "-y"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            return audio_path
+        except subprocess.CalledProcessError as e:
+            st.error(f"Error extracting audio: {e.stderr.decode()}")
+            return None
 
 def translate_text(text, target_language):
     if target_language == "en":
@@ -108,7 +119,7 @@ def generate_pdf(content, language):
 
 st.title("🎙️ Meeting/Podcast Summarizer")
 selected_language = st.selectbox("Choose Language", options=list(languages.keys()))
-uploaded_file = st.file_uploader("Choose an audio/video file", type=["wav", "mp3", "mp4"])
+uploaded_file = st.file_uploader("Choose an audio/video file", type=["wav", "mp3", "mp4", "webm"])
 
 if uploaded_file is not None:
     file_bytes = uploaded_file.read()
